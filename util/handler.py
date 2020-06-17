@@ -9,6 +9,7 @@ from typing import Callable, List, Dict
 import pandas as pd
 import yaml
 from joblib import Parallel, delayed
+from pkg_resources import resource_filename
 
 from util import matplotlib_setup, set_all_random_seeds, save_results
 
@@ -16,13 +17,15 @@ from util import matplotlib_setup, set_all_random_seeds, save_results
 class ExperimentHandler:
 
     def __init__(self,
+                 experiment_name: str,
                  config_name: str,
                  run_func: Callable,
                  analysis_func: Callable,
                  logger_level=logging.INFO
                  ):
         self.config_name = config_name
-        self.config_path = os.path.join('config', config_name + '.yml')
+        self.config_path = \
+            resource_filename('experiments', os.path.join(experiment_name, 'config', f'{config_name}.yml'))
         self.run_func = run_func
         self.analysis_func = analysis_func
         self.logger_level = logger_level
