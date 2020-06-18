@@ -1,5 +1,4 @@
 import logging
-import sys
 import time
 from logging import Logger
 from typing import Sequence, Dict
@@ -9,32 +8,10 @@ import pandas as pd
 from scipy.stats import trim_mean
 
 from active_learning_ratio_estimation.model.ratio_model import calibrated_param_scan, param_scan, exact_param_scan
-import tensorflow as tf
-import tensorflow_probability as tfp
-
-tfd = tfp.distributions
-
 from active_learning_ratio_estimation.dataset import SinglyParameterizedRatioDataset, ParamGrid, ParamIterator
 from active_learning_ratio_estimation.model import DenseClassifier, SinglyParameterizedRatioModel, FlipoutClassifier
 
-
-def triple_mixture(gamma):
-    gamma = tf.cast(gamma, tf.float32)
-    mixture_probs = [
-        0.5 * (1 - gamma),
-        0.5 * (1 - gamma),
-        gamma
-    ]
-    gaussians = [
-        tfd.Normal(loc=-2, scale=0.75),
-        tfd.Normal(loc=0, scale=2),
-        tfd.Normal(loc=1, scale=0.5)
-    ]
-    dist = tfd.Mixture(
-        cat=tfd.Categorical(probs=mixture_probs),
-        components=gaussians
-    )
-    return dist
+from util.distributions import triple_mixture
 
 
 def create_models(
