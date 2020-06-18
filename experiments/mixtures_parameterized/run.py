@@ -5,7 +5,7 @@ from util import ExperimentHandler
 
 def run(config: str, n_experiments: int, n_jobs: int = 1, analysis: bool = True):
     handler = ExperimentHandler(
-        __package__.split('.')[-1],
+        'mixtures_parameterized',
         config_name=config,
         run_func=run_mixtures_parameterized,
         analysis_func=analyse_mixtures_parameterized
@@ -16,4 +16,4 @@ def run(config: str, n_experiments: int, n_jobs: int = 1, analysis: bool = True)
 
 
 if __name__ == '__main__':
-    run(config='dev', n_experiments=1, n_jobs=1)
+    run(config='dev', n_experiments=1, n_jobs=1, analysis=False)

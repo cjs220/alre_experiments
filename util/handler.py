@@ -59,8 +59,8 @@ class ExperimentHandler:
             for frame_name, frame in result.items():
                 out_path = os.path.join(run_dir, frame_name + '.csv')
                 frame.to_csv(out_path)
-
-        self.results += new_results
+        if new_results:
+            self.results += new_results
 
     def run_analysis(self) -> None:
         figures = self.analysis_func(self._list_of_dict_to_dict_of_list(self.results))
@@ -108,4 +108,7 @@ class ExperimentHandler:
 
     @staticmethod
     def _list_of_dict_to_dict_of_list(list_of_dict: List[Dict]) -> Dict[str, List]:
-        return {k: [d[k] for d in list_of_dict] for k in list_of_dict[0]}
+        try:
+            return {k: [d[k] for d in list_of_dict] for k in list_of_dict[0]}
+        except IndexError:
+            return {}
