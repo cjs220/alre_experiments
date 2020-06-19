@@ -33,20 +33,35 @@ def create_models(
     return models
 
 
-def fit_and_predict_models(
+def fit_models(
         models: Dict[str, SinglyParameterizedRatioModel],
         train_dataset: SinglyParameterizedRatioDataset,
-        test_dataset: SinglyParameterizedRatioDataset,
+        logger: Logger
 ) -> pd.DataFrame:
+    for model_name, model in models.items():
+        logger.info(f'Fitting {model_name} model.')
+        model.fit(train_dataset.x, train_dataset.theta_1s, train_dataset.y)
+        history = pd.DataFrame(model.clf.history_.history)
+        logger.info(f'Finished fitting {model_name} model. Training history:\n{history}')
+    return models
+
+
+def predict_models(
+        models: Dict[str, SinglyParameterizedRatioModel],
+        test_dataset: SinglyParameterizedRatioDataset,
+        logger: Logger
+):
     predictions = pd.DataFrame(dict(
         theta=test_dataset.theta_1s.squeeze(),
         x=test_dataset.x.squeeze(),
         Exact=(test_dataset.log_prob_1 - test_dataset.log_prob_0).squeeze()
     ))
+
     for model_name, model in models.items():
-        model.fit(train_dataset.x, train_dataset.theta_1s, train_dataset.y)
+        logger.info(f'Predicting with {model_name} model')
         logr = model.predict(test_dataset.x, test_dataset.theta_1s, log=True)
         predictions[model_name] = logr
+
     return predictions
 
 
@@ -135,14 +150,16 @@ def run_mixtures_parameterized(
     )
     test_ds = test_ds[test_ds.y == 1]
 
-    logger.info('Fitting and predicting models')
-    # TODO fit and predict as separate functions so can log
+    logger.info('Fitting models')
     models = create_models(theta_0=theta_0, hyperparams=hyperparams)
-    predictions = fit_and_predict_models(
+    models = fit_models(
         models=models,
         train_dataset=train_ds,
-        test_dataset=test_ds
+        logger=logger
     )
+
+    logger.info('Predicting with models')
+    predictions = predict_models(models=models, test_dataset=test_ds, logger=logger)
 
     logger.info('Performing calibrated predict')
     predictions['Calibrated'] = calibrated_predict(
