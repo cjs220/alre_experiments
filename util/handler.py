@@ -39,7 +39,6 @@ class ExperimentHandler:
         self.results = self._load_existing_results()
 
     def run_experiments(self, n_experiments: int, n_jobs: int = 1) -> None:
-        matplotlib_setup()
         set_all_random_seeds()
 
         run_dirs = []
@@ -64,7 +63,8 @@ class ExperimentHandler:
             self.results += new_results
 
     def run_analysis(self) -> None:
-        figures = self.analysis_func(self._list_of_dict_to_dict_of_list(self.results))
+        matplotlib_setup(use_tex=False)
+        figures = self.analysis_func(self._list_of_dict_to_dict_of_list(self.results), self.config)
         save_results(path=os.path.join('plots', self.config_name), figures=figures, exist_ok=True)
 
     def _load_existing_results(self):
@@ -74,6 +74,14 @@ class ExperimentHandler:
             self._check_same_config(dir_path)
             result = dict()
             csv_names = [fname for fname in os.listdir(dir_path) if fname.endswith('.csv')]
+
+            if not csv_names:
+                delete_dir = input(f'Directory {dir_path} contains no csv files; '
+                                   f'would you like to delete it? (y/n)') == 'y'
+                if delete_dir:
+                    shutil.rmtree(dir_path)
+                    continue
+
             for csv_name in csv_names:
                 key, _ = csv_name.split('.csv')
                 result[key] = pd.read_csv(os.path.join(dir_path, csv_name), index_col=0)
