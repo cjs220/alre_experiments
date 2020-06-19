@@ -5,6 +5,7 @@ import sys
 import time
 from pathlib import Path
 from typing import Callable, List, Dict
+from warnings import warn
 
 import pandas as pd
 import yaml
@@ -68,8 +69,9 @@ class ExperimentHandler:
 
     def _load_existing_results(self):
         existing_results = []
-        for dir in os.listdir(self.out_dir):
-            dir_path = os.path.join(self.out_dir, dir)
+        for dir_name in os.listdir(self.out_dir):
+            dir_path = os.path.join(self.out_dir, dir_name)
+            self._check_same_config(dir_path)
             result = dict()
             csv_names = [fname for fname in os.listdir(dir_path) if fname.endswith('.csv')]
             for csv_name in csv_names:
@@ -78,6 +80,16 @@ class ExperimentHandler:
             if result:
                 existing_results.append(result)
         return existing_results
+
+    def _check_same_config(self, dir_path):
+        config_path = os.path.join(dir_path, 'config.yml')
+        with open(config_path, 'r') as infile:
+            config = yaml.safe_load(infile)
+        if set(config.keys()) != set(self.config.keys()):
+            warn(f'Config {config_path} as different keys to this config.')
+        for item_name, item_val in config.items():
+            if item_val != self.config.get(item_name, None):
+                warn(f'Config {config_path} has different value for config item {item_name}.')
 
     def _init_run_dir(self):
         run_dir_name = pd.Timestamp.now().strftime('%Y-%m-%d_%H%M%S')
@@ -92,8 +104,7 @@ class ExperimentHandler:
 
         logger = logging.getLogger(logger_name)
         logger.setLevel(self.logger_level)
-        format_string = ("%(asctime)s — %(name)s — %(levelname)s — %(funcName)s:"
-                         "%(lineno)d — %(message)s")
+        format_string = "%(asctime)s — %(name)s — %(levelname)s — %(message)s"
         log_format = logging.Formatter(format_string)
 
         console_handler = logging.StreamHandler(sys.stdout)
