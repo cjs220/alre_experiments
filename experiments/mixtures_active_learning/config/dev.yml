@@ -1,0 +1,19 @@
+theta_0: 0.5
+theta_true: 0.45
+theta_bounds: [0.1, 0.9]
+n_theta: 9
+initial_idx: [0, 8]
+
+hyperparams:
+  n_hidden: [15, 15]
+  epochs: 1
+  patience: 5
+  validation_split: 0.1
+  verbose: 0
+  fit_batch_size: 32
+  predict_batch_size: 32
+
+n_true: 500
+n_samples_per_theta: 100
+n_iter: 2
+ucb_kappa: 1.0
