@@ -1,7 +1,6 @@
 from argparse import ArgumentParser
 
-from experiments.mixtures_parameterized.analysis import analyse_mixtures_parameterized
-from experiments.mixtures_parameterized.experiment import run_mixtures_parameterized
+from experiments.mixtures_active_learning.mal_experiment import run_mixtures_active_learning
 from util import ExperimentHandler
 
 
@@ -13,10 +12,10 @@ parser.add_argument('-j', '--jobs', required=True, help='Number of jobs for mult
 
 def run(config: str, n_experiments: int, n_jobs: int = 1):
     handler = ExperimentHandler(
-        'mixtures_parameterized',
+        'mixtures_active_learning',
         config_name=config,
-        run_func=run_mixtures_parameterized,
-        analysis_func=analyse_mixtures_parameterized
+        run_func=run_mixtures_active_learning,
+        analysis_func=None
     )
     handler.run_experiments(n_experiments=n_experiments, n_jobs=n_jobs)
     handler.run_analysis()
