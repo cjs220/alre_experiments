@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name='alre_experiments',
-    version='0.1dev',
+    version='0.1',
     packages=['util', 'experiments', 'experiments.mixtures_parameterized'],
     url='github.com/cjs220/alre_experiments',
     license='MIT',
