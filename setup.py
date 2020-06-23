@@ -3,7 +3,12 @@ from setuptools import setup
 setup(
     name='alre_experiments',
     version='0.2dev',
-    packages=['util', 'experiments', 'experiments.mixtures_parameterized'],
+    packages=[
+        'util',
+        'experiments',
+        'experiments.mixtures_parameterized',
+        'experiments.mixtures_active_learning'
+    ],
     url='github.com/cjs220/alre_experiments',
     license='MIT',
     author='Conor Sheehan',
