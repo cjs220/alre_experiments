@@ -39,8 +39,6 @@ class ExperimentHandler:
         self.results = self._load_existing_results()
 
     def run_experiments(self, n_experiments: int, n_jobs: int = 1) -> None:
-        set_all_random_seeds()
-
         run_dirs = []
         for i in range(n_experiments):
             run_dirs.append(self._init_run_dir())
@@ -49,10 +47,13 @@ class ExperimentHandler:
         loggers = [self._get_logger(run_dir) for run_dir in run_dirs]
 
         if n_jobs == 1:
-            new_results = [self.run_func(**self.config, logger=loggers[i]) for i in range(n_experiments)]
+            new_results = [
+                self.run_func(**self.config, random_seed=i+len(self.results), logger=loggers[i]) for i in range(n_experiments)
+            ]
         else:
             new_results = Parallel(n_jobs=n_jobs, verbose=10)(
-                delayed(self.run_func)(**self.config, logger=loggers[i]) for i in range(n_experiments)
+                delayed(self.run_func)(**self.config, random_seed=i+len(self.results), logger=loggers[i])
+                for i in range(n_experiments)
             )
 
         for run_dir, result in zip(run_dirs, new_results):

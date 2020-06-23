@@ -12,6 +12,7 @@ from active_learning_ratio_estimation.active_learning.active_learner import Uppe
 from active_learning_ratio_estimation.dataset import ParamGrid
 from active_learning_ratio_estimation.model import FlipoutClassifier, SinglyParameterizedRatioModel
 from active_learning_ratio_estimation.model.ratio_model import exact_param_scan
+from util import experiment
 from util.distributions import triple_mixture
 
 
@@ -20,6 +21,7 @@ def create_model(theta_0: float, hyperparams: Dict):
     return SinglyParameterizedRatioModel(theta_0=theta_0, clf=clf)
 
 
+@experiment
 def run_mixtures_active_learning(
         theta_0: float,
         theta_true: float,

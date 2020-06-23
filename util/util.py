@@ -1,3 +1,4 @@
+import time
 from typing import Dict, Callable
 import os
 import random
@@ -91,3 +92,18 @@ def plot_line_graph_with_errors(mean: pd.DataFrame, stderr: pd.DataFrame, ax=Non
             **kwargs
         )
     return ax
+
+
+def experiment(func: Callable) -> Callable:
+    # decorator for experiment functions
+
+    def wrapper(*args, random_seed=0, **kwargs):
+        logger = kwargs['logger']
+        logger.info('Starting experiment')
+        t0 = time.time()
+        set_all_random_seeds(random_seed)
+        results = func(*args, **kwargs)
+        logger.info(f'Finished experiment; total time {int(time.time() - t0):.3E} s')
+        return results
+
+    return wrapper

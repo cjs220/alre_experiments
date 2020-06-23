@@ -1,5 +1,6 @@
 from argparse import ArgumentParser
 
+from experiments.mixtures_active_learning.mal_analysis import analyse_mixtures_active_learning
 from experiments.mixtures_active_learning.mal_experiment import run_mixtures_active_learning
 from util import ExperimentHandler
 
@@ -15,7 +16,7 @@ def run(config: str, n_experiments: int, n_jobs: int = 1):
         'mixtures_active_learning',
         config_name=config,
         run_func=run_mixtures_active_learning,
-        analysis_func=None
+        analysis_func=analyse_mixtures_active_learning,
     )
     handler.run_experiments(n_experiments=n_experiments, n_jobs=n_jobs)
     handler.run_analysis()
