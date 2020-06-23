@@ -69,15 +69,15 @@ def plot_average_test_stat(test_stat: pd.DataFrame) -> Figure:
 
 
 def plot_test_stat(test_stat: pd.DataFrame) -> Figure:
-    fig, axarr = plt.subplots(test_stat.shape[1] - 1, sharex=True, figsize=(15, 10))
+    fig, axarr = plt.subplots(test_stat.shape[1] - 1, sharex=True, figsize=(17, 10))
     non_exact_cols = filter(lambda x: x != 'Exact', test_stat.columns)
-    alpha = 0.3
+    alpha = 0.1
     for ax, col in zip(axarr, non_exact_cols):
         test_stat[col].unstack(0).plot(ax=ax, alpha=alpha, color='r', label=None)
         test_stat['Exact'].unstack(0).plot(ax=ax, alpha=alpha, color='b', label=None)
-        ax.set(title=col)
+        ax.set(title=col, ylim=(0, 600), xlim=(0.1, 0.9))
         ax.legend().set_visible(False)
-        ax.set_ylabel(TEST_STAT_ABBRV_STR, rotation=0, labelpad=5)
+        ax.set_ylabel(TEST_STAT_ABBRV_STR, rotation=90, labelpad=5)
     axarr[-1].set(xlabel=THETA_STR)
     return fig
 
@@ -88,7 +88,7 @@ def plot_test_stat_mse(test_stat: pd.DataFrame) -> Figure:
     mean_squared_error = squared_error.mean(axis=0, level=1)
     stderr_squared_error = squared_error.sem(axis=0, level=1)
     ax = plot_line_graph_with_errors(mean=mean_squared_error, stderr=stderr_squared_error, ax=ax)
-    ax.set(yscale='log', xlabel=THETA_STR, title=f'Squared error on {TEST_STAT_STR}')
+    ax.set(yscale='log', xlabel=THETA_STR, title=f'Squared error on {TEST_STAT_ABBRV_STR}={TEST_STAT_STR}')
     return fig
 
 
