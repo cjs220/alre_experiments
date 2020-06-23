@@ -1,1 +1,2 @@
 include experiments/mixtures_parameterized/config/*.yml
+include experiments/mixture_active_learning/config/*.yml
