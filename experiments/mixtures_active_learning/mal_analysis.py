@@ -6,6 +6,7 @@ import pandas as pd
 from matplotlib.figure import Figure
 from pandas.core.generic import NDFrame
 
+from experiments.mixtures_parameterized.mp_analysis import TEST_STAT_ABBRV_STR, THETA_STR
 from util import plot_line_graph_with_errors
 
 
@@ -40,6 +41,22 @@ def plot_total_mse(ucb_test_stat: List[pd.DataFrame], random_test_stat: List[pd.
     return fig
 
 
+def plot_final_iteration_test_stat(ucb_test_stat: List[pd.DataFrame], random_test_stat: List[pd.DataFrame]) -> Figure:
+    alpha = 0.8
+    fig, axarr = plt.subplots(2)
+    for ax, test_stat, name in zip(axarr, [ucb_test_stat, random_test_stat], ['UCB', 'Random']):
+        n = len(test_stat)
+        exact_test_stat = pd.concat([ts.iloc[:, -1] for ts in test_stat], axis=1, keys=range(n))
+        test_stat = pd.concat([ts.iloc[:, -2] for ts in test_stat], axis=1, keys=range(n))
+        exact_test_stat.plot(color='b', label=None, alpha=alpha, ax=ax)
+        test_stat.plot(color='r', label=None, alpha=alpha, ax=ax)
+        ax.legend().set_visible(False)
+        ax.set_ylabel(TEST_STAT_ABBRV_STR, rotation=90, labelpad=5)
+        ax.set(title=name)
+    axarr[-1].set(xlabel=THETA_STR)
+    return fig
+
+
 def analyse_mixtures_active_learning(results: Dict[str, List[NDFrame]], config: Dict):
     mle = results['mle']
     ucb_nllr = results['ucb_nllr']
@@ -57,9 +74,12 @@ def analyse_mixtures_active_learning(results: Dict[str, List[NDFrame]], config: 
 
     mse_fig = plot_total_mse(ucb_test_stat=ucb_test_stat, random_test_stat=random_test_stat)
 
+    test_stat_fig = plot_final_iteration_test_stat(ucb_test_stat=ucb_test_stat, random_test_stat=random_test_stat)
+
     figures = dict(
         mle_err=mle_err_fig,
-        mse=mse_fig
+        mse=mse_fig,
+        test_stat=test_stat_fig
     )
 
     return figures
