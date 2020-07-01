@@ -36,8 +36,6 @@ def run_mixtures_active_learning(
         logger: Logger = None
 ) -> Dict[str, NDFrame]:
     logger = logger or logging.getLogger(__name__)
-    logger.info('Starting experiment')
-    t0 = time.time()
 
     logger.info('Simulating X_true and performing exact param scan')
     param_grid = ParamGrid(bounds=[theta_bounds], num=n_theta)
@@ -96,7 +94,7 @@ def run_mixtures_active_learning(
         return pd.DataFrame(
             data=np.stack(getattr(active_learners[learner_name], info), axis=1),
             columns=[f'Iteration {i}' for i in range(n_iter + 1)],
-            index=param_grid.array.squeeze()
+            index=np.around(param_grid.array.squeeze(), 6)  # TODO
         )
 
     random_nllr = _collect_nllr_info('Random', 'nllr_predictions')
@@ -105,7 +103,6 @@ def run_mixtures_active_learning(
     random_nllr['Exact'] = nllr_exact.squeeze()
     ucb_nllr['Exact'] = nllr_exact.squeeze()
 
-    logger.info(f'Finished experiment; total time {int(time.time() - t0):.3E} s')
     return dict(
         mle=mle,
         trialed_thetas=trialed_thetas,
