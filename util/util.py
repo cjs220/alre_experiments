@@ -19,8 +19,8 @@ def disable_tensorflowgpu():
 
 def set_all_random_seeds(seed=0):
     np.random.seed(seed)
-    tf.random.set_seed(0)
-    random.seed(0)
+    tf.random.set_seed(seed)
+    random.seed(seed)
 
 
 def matplotlib_setup(size=24, use_tex=False):
