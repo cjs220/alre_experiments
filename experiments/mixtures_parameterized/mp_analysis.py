@@ -7,7 +7,7 @@ from matplotlib import pyplot as plt
 from matplotlib.figure import Figure
 from pandas.core.generic import NDFrame
 
-from util import plot_line_graph_with_errors
+from util.plotting import plot_line_graph_with_errors
 
 TEST_STAT_STR = r'$-2 \, \log \frac{L(\theta)}{L(\theta_{MLE})}$'
 THETA_STR = r'$\theta$'

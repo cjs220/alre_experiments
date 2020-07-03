@@ -7,7 +7,7 @@ from matplotlib.figure import Figure
 from pandas.core.generic import NDFrame
 
 from experiments.mixtures_parameterized.mp_analysis import TEST_STAT_ABBRV_STR, THETA_STR
-from util import plot_line_graph_with_errors
+from util.plotting import plot_line_graph_with_errors
 
 
 def plot_mle_error(mle_err) -> Figure:

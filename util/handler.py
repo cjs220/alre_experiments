@@ -12,7 +12,8 @@ import yaml
 from joblib import Parallel, delayed
 from pkg_resources import resource_filename
 
-from util import matplotlib_setup, set_all_random_seeds, save_results
+from util import set_all_random_seeds, save_results
+from util.plotting import matplotlib_setup
 
 
 class ExperimentHandler:

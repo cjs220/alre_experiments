@@ -1,2 +1,2 @@
-from util.util import *
+from util.general import *
 from util.handler import *
