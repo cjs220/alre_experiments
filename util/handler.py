@@ -48,11 +48,16 @@ class ExperimentHandler:
 
         if n_jobs == 1:
             new_results = [
-                self.run_func(**self.config, random_seed=i+len(self.results), logger=loggers[i]) for i in range(n_experiments)
+                self.run_func(
+                    **self.config,
+                    random_seed=i + len(self.results),
+                    logger=loggers[i]
+                )
+                for i in range(n_experiments)
             ]
         else:
             new_results = Parallel(n_jobs=n_jobs, verbose=10)(
-                delayed(self.run_func)(**self.config, random_seed=i+len(self.results), logger=loggers[i])
+                delayed(self.run_func)(**self.config, random_seed=i + len(self.results), logger=loggers[i])
                 for i in range(n_experiments)
             )
 
