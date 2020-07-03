@@ -15,6 +15,7 @@ def plot_mle_error(mle_err) -> Figure:
     mean = mle_err.mean(axis=1, level=1)
     stderr = mle_err.sem(axis=1, level=1)
     plot_line_graph_with_errors(mean=mean, stderr=stderr, ax=ax)
+    ax.set(title='MAE on MLE estimate')
     return fig
 
 
@@ -42,7 +43,7 @@ def plot_total_mse(ucb_test_stat: List[pd.DataFrame], random_test_stat: List[pd.
 
 
 def plot_final_iteration_test_stat(ucb_test_stat: List[pd.DataFrame], random_test_stat: List[pd.DataFrame]) -> Figure:
-    alpha = 0.8
+    alpha = 0.2
     fig, axarr = plt.subplots(2)
     for ax, test_stat, name in zip(axarr, [ucb_test_stat, random_test_stat], ['UCB', 'Random']):
         n = len(test_stat)
