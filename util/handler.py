@@ -194,7 +194,8 @@ class ExperimentHandler:
         return list(self.results.keys())
 
     def _get_new_random_seeds(self, n_experiments: int) -> List[int]:
-        max_trialed_seed = max(self._trialed_seeds)
+        max_trialed_seed = max(self._trialed_seeds) \
+            if self._trialed_seeds else -1
         random_seeds = list(range(max_trialed_seed + 1,
                                   max_trialed_seed + n_experiments + 1))
         return random_seeds
