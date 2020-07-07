@@ -19,47 +19,56 @@ def plot_mle_error(mle_err) -> Figure:
     return fig
 
 
-def get_test_stat(nllrs: List[pd.DataFrame]) -> List[pd.DataFrame]:
-    return [2*(nllr.subtract(nllr.min(), axis=1)) for nllr in nllrs]
-
-
 def plot_total_mse(
-        ucb_test_stat: List[pd.DataFrame],
-        random_test_stat: List[pd.DataFrame]
+        test_stat: pd.DataFrame,
+        test_stat_exact: pd.DataFrame
 ) -> Figure:
+    group_levels = ['Learner', 'Iteration']
+    columns = test_stat.columns.get_level_values('Learner').unique()
+    index = test_stat.columns.get_level_values('Iteration').unique()
+    mean = pd.DataFrame(index=index, columns=columns)
+    stderr = pd.DataFrame(index=index, columns=columns)
+    gb = test_stat.groupby(axis=1, level=group_levels)
 
-    def _get_total_mse(test_stats):
-        squared_error = [(ts.subtract(ts['Exact'], axis=0) ** 2).drop('Exact', axis=1).mean(axis=0)
-                         for ts in test_stats]
-        squared_error = pd.concat(squared_error, axis=1, keys=range(len(squared_error)))
-        return squared_error
+    for group in gb.groups.keys():
+        pred_group = gb.get_group(group).droplevel(axis=1, level=group_levels)
+        squared_error = (test_stat_exact - pred_group) ** 2
+        mse_group = squared_error.mean(axis=0)
+        mean_mse_group = mse_group.mean()
+        stderr_group = mse_group.sem()
+        learner, iteration = group
+        mean.loc[iteration, learner] = mean_mse_group
+        stderr.loc[iteration, learner] = stderr_group
 
-    ucb_mse = _get_total_mse(ucb_test_stat)
-    random_mse = _get_total_mse(random_test_stat)
-    mse = pd.concat([ucb_mse, random_mse], axis=1, keys=['UCB', 'Random']).reset_index(drop=True)
-    mean = mse.mean(axis=1, level=0)
-    stderr = mse.sem(axis=1, level=0)
     fig, ax = plt.subplots()
-    plot_line_graph_with_errors(mean=mean, stderr=stderr, ax=ax)
+    plot_line_graph_with_errors(
+        mean=mean.astype(np.float64),
+        stderr=stderr.astype(np.float64),
+        ax=ax
+    )
     ax.set(title='Total MSE', xlabel='Active learning iteration')
+
     return fig
 
 
 def plot_final_iteration_test_stat(
-        ucb_test_stat: List[pd.DataFrame],
-        random_test_stat: List[pd.DataFrame]
+        test_stat: pd.DataFrame,
+        test_stat_exact: pd.DataFrame
 ) -> Figure:
     alpha = 0.2
-    fig, axarr = plt.subplots(2)
-    for ax, test_stat, name in zip(axarr, [ucb_test_stat, random_test_stat], ['UCB', 'Random']):
-        n = len(test_stat)
-        exact_test_stat = pd.concat([ts.iloc[:, -1] for ts in test_stat], axis=1, keys=range(n))
-        test_stat = pd.concat([ts.iloc[:, -2] for ts in test_stat], axis=1, keys=range(n))
-        exact_test_stat.plot(color='b', label=None, alpha=alpha, ax=ax)
-        test_stat.plot(color='r', label=None, alpha=alpha, ax=ax)
+    learners = test_stat.columns.get_level_values('Learner').unique()
+    fig, axarr = plt.subplots(nrows=len(learners), figsize=(10, 2.5 * len(learners)))
+    ax_list = np.ravel(axarr).tolist()
+    gb = test_stat.groupby(level='Learner', axis=1)
+    for i, learner_name in enumerate(gb.groups.keys()):
+        test_stat_group = gb.get_group(learner_name).droplevel(level='Learner', axis=1)
+        ax = ax_list[i]
+        test_stat_group.plot(ax=ax, alpha=alpha, color='r')
+        test_stat_exact.plot(ax=ax, alpha=alpha, color='b')
         ax.legend().set_visible(False)
+        ax.set_xlabel(None)
         ax.set_ylabel(TEST_STAT_ABBRV_STR, rotation=90, labelpad=5)
-        ax.set(title=name)
+        ax.set(title=learner_name)
     axarr[-1].set(xlabel=THETA_STR)
     return fig
 
@@ -69,7 +78,7 @@ def _plot_debug_graph(
         ucb_std: pd.DataFrame,
         iterations: Sequence[int]
 ) -> Figure:
-    fig, axarr = plt.subplots(len(iterations), figsize=(10, len(iterations)*2.5))
+    fig, axarr = plt.subplots(len(iterations), figsize=(10, len(iterations) * 2.5))
     for ax, iteration in zip(np.ravel(axarr), iterations):
         column = f'Iteration {iteration}'
         plot_line_graph_with_errors(
@@ -86,9 +95,9 @@ def analyse_mixtures_active_learning(
         config: Dict
 ):
     mle = results['mle']
-    nllr = results['nllr']
-    std = results['std']
-    pd.concat(nllr, axis=1, keys=range(len(nllr)), names=('Experiment', 'Iteration'))
+    nllr = _aggregrate_nllr_predictions(results['nllr'])
+    std = _aggregrate_nllr_predictions(results['std'])
+    nllr_exact = results['nllr_exact']
 
     mle_err = pd.concat(
         [df.subtract(df['Exact'], axis=0).drop('Exact', axis=1) for df in mle],
@@ -97,12 +106,15 @@ def analyse_mixtures_active_learning(
     ).abs()
     mle_err_fig = plot_mle_error(mle_err)
 
-    ucb_test_stat = get_test_stat(ucb_nllr)
-    random_test_stat = get_test_stat(random_nllr)
+    test_stat = _calc_test_stat(nllr)
+    test_stat_exact = pd.concat(map(_calc_test_stat, nllr_exact), axis=1)
+    test_stat_exact.columns = range(len(nllr_exact))
 
-    mse_fig = plot_total_mse(ucb_test_stat=ucb_test_stat, random_test_stat=random_test_stat)
-
-    test_stat_fig = plot_final_iteration_test_stat(ucb_test_stat=ucb_test_stat, random_test_stat=random_test_stat)
+    mse_fig = plot_total_mse(test_stat=test_stat, test_stat_exact=test_stat_exact)
+    test_stat_fig = plot_final_iteration_test_stat(
+        test_stat=test_stat,
+        test_stat_exact=test_stat_exact
+    )
 
     figures = dict(
         mle_err=mle_err_fig,
@@ -111,3 +123,28 @@ def analyse_mixtures_active_learning(
     )
 
     return figures
+
+
+def _aggregrate_nllr_predictions(
+        predictions: List[pd.DataFrame],
+):
+    def _add_learner_level(df):
+        learners = df['Learner'].unique()
+        return pd.concat(
+            [df[df['Learner'] == learner].drop('Learner', axis=1) for learner in learners],
+            axis=1,
+            keys=learners
+        )
+
+    aggregated = pd.concat(
+        map(_add_learner_level, predictions),
+        axis=1,
+        keys=range(len(predictions)),
+        names=('Experiment', 'Learner', 'Iteration')
+    )
+    aggregated.index.name = 'theta'
+    return aggregated
+
+
+def _calc_test_stat(nllr: pd.DataFrame) -> pd.DataFrame:
+    return 2 * (nllr - nllr.min())
