@@ -1,4 +1,4 @@
-from typing import Dict, List
+from typing import Dict, List, Sequence
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -55,6 +55,23 @@ def plot_final_iteration_test_stat(ucb_test_stat: List[pd.DataFrame], random_tes
         ax.set_ylabel(TEST_STAT_ABBRV_STR, rotation=90, labelpad=5)
         ax.set(title=name)
     axarr[-1].set(xlabel=THETA_STR)
+    return fig
+
+
+def _plot_debug_graph(
+        ucb_nllr: pd.DataFrame,
+        ucb_std: pd.DataFrame,
+        iterations: Sequence[int]
+):
+    fig, axarr = plt.subplots(len(iterations), figsize=(10, len(iterations)*2.5))
+    for ax, iteration in zip(np.ravel(axarr), iterations):
+        column = f'Iteration {iteration}'
+        plot_line_graph_with_errors(
+            mean=ucb_nllr[column].to_frame(),
+            stderr=ucb_std[column].to_frame(),
+            ax=ax
+        )
+        ucb_nllr['Exact'].plot(ax=ax, color='r', label='Exact')
     return fig
 
 
