@@ -16,4 +16,4 @@ hyperparams:
 n_true: 500
 n_samples_per_theta: 100
 n_iter: 2
-ucb_kappa: 1.0
+ucb_kappas: [1.0, 10.0, 100.0]

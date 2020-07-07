@@ -23,7 +23,10 @@ def get_test_stat(nllrs: List[pd.DataFrame]) -> List[pd.DataFrame]:
     return [2*(nllr.subtract(nllr.min(), axis=1)) for nllr in nllrs]
 
 
-def plot_total_mse(ucb_test_stat: List[pd.DataFrame], random_test_stat: List[pd.DataFrame]) -> Figure:
+def plot_total_mse(
+        ucb_test_stat: List[pd.DataFrame],
+        random_test_stat: List[pd.DataFrame]
+) -> Figure:
 
     def _get_total_mse(test_stats):
         squared_error = [(ts.subtract(ts['Exact'], axis=0) ** 2).drop('Exact', axis=1).mean(axis=0)
@@ -42,7 +45,10 @@ def plot_total_mse(ucb_test_stat: List[pd.DataFrame], random_test_stat: List[pd.
     return fig
 
 
-def plot_final_iteration_test_stat(ucb_test_stat: List[pd.DataFrame], random_test_stat: List[pd.DataFrame]) -> Figure:
+def plot_final_iteration_test_stat(
+        ucb_test_stat: List[pd.DataFrame],
+        random_test_stat: List[pd.DataFrame]
+) -> Figure:
     alpha = 0.2
     fig, axarr = plt.subplots(2)
     for ax, test_stat, name in zip(axarr, [ucb_test_stat, random_test_stat], ['UCB', 'Random']):
@@ -62,7 +68,7 @@ def _plot_debug_graph(
         ucb_nllr: pd.DataFrame,
         ucb_std: pd.DataFrame,
         iterations: Sequence[int]
-):
+) -> Figure:
     fig, axarr = plt.subplots(len(iterations), figsize=(10, len(iterations)*2.5))
     for ax, iteration in zip(np.ravel(axarr), iterations):
         column = f'Iteration {iteration}'
@@ -75,10 +81,14 @@ def _plot_debug_graph(
     return fig
 
 
-def analyse_mixtures_active_learning(results: Dict[str, List[NDFrame]], config: Dict):
+def analyse_mixtures_active_learning(
+        results: Dict[str, List[NDFrame]],
+        config: Dict
+):
     mle = results['mle']
-    ucb_nllr = results['ucb_nllr']
-    random_nllr = results['random_nllr']
+    nllr = results['nllr']
+    std = results['std']
+    pd.concat(nllr, axis=1, keys=range(len(nllr)), names=('Experiment', 'Iteration'))
 
     mle_err = pd.concat(
         [df.subtract(df['Exact'], axis=0).drop('Exact', axis=1) for df in mle],
