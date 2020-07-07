@@ -74,19 +74,52 @@ def plot_final_iteration_test_stat(
 
 
 def _plot_debug_graph(
-        ucb_nllr: pd.DataFrame,
-        ucb_std: pd.DataFrame,
-        iterations: Sequence[int]
+        test_stat: pd.DataFrame,
+        std: pd.DataFrame,
+        test_stat_exact: pd.DataFrame,
+        experiment: int,
+        iterations: List[int],
+        learner_names: List[str] = None
 ) -> Figure:
-    fig, axarr = plt.subplots(len(iterations), figsize=(10, len(iterations) * 2.5))
-    for ax, iteration in zip(np.ravel(axarr), iterations):
-        column = f'Iteration {iteration}'
+    learner_names = learner_names \
+                    or test_stat.columns.get_level_values('Learner').unique()
+    fig, axarr = plt.subplots(len(iterations), figsize=(10, len(iterations) * 5))
+
+    experiment_filter = \
+        test_stat.columns.get_level_values('Experiment') == experiment
+
+    for ax, iteration in zip(axarr, iterations):
+        iteration_filter = \
+            test_stat.columns.get_level_values('Iteration') == iteration
+
+        learner_filter = \
+            np.in1d(test_stat.columns.get_level_values('Learner'), learner_names)
+
+        mask = iteration_filter & learner_filter & experiment_filter
+        mean = (test_stat
+                .loc[:, mask]
+                .droplevel(['Experiment', 'Iteration'], axis=1)
+                )
+        stderr = (std
+                  .loc[:, mask]
+                  .fillna(0)
+                  .droplevel(['Experiment', 'Iteration'], axis=1)
+                  )
         plot_line_graph_with_errors(
-            mean=ucb_nllr[column].to_frame(),
-            stderr=ucb_std[column].to_frame(),
+            mean=mean,
+            stderr=stderr,
             ax=ax
         )
-        ucb_nllr['Exact'].plot(ax=ax, color='r', label='Exact')
+        (test_stat_exact
+         .iloc[:, 0]
+         .plot(color='k', lw=2, label='Exact', ax=ax))  # TODO!! hardcoded
+        ax.set(
+            title=f'Iteration {iteration}',
+            xlabel=None,
+            ylabel=TEST_STAT_ABBRV_STR
+        )
+        ax.legend()
+    axarr[-1].set_xlabel(THETA_STR)
     return fig
 
 
@@ -114,6 +147,14 @@ def analyse_mixtures_active_learning(
     test_stat_fig = plot_final_iteration_test_stat(
         test_stat=test_stat,
         test_stat_exact=test_stat_exact
+    )
+
+    debug_fig = _plot_debug_graph(
+        test_stat=test_stat,
+        std=std,
+        test_stat_exact=test_stat_exact,
+        experiment=0,
+        iterations=['Iteration 0', 'Iteration 1'],
     )
 
     figures = dict(
