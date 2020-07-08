@@ -1,4 +1,4 @@
-from typing import Dict, List, Sequence
+from typing import Dict, List, Sequence, Callable
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -73,56 +73,6 @@ def plot_final_iteration_test_stat(
     return fig
 
 
-def _plot_debug_graph(
-        test_stat: pd.DataFrame,
-        std: pd.DataFrame,
-        test_stat_exact: pd.DataFrame,
-        experiment: int,
-        iterations: List[int],
-        learner_names: List[str] = None
-) -> Figure:
-    learner_names = learner_names \
-                    or test_stat.columns.get_level_values('Learner').unique()
-    fig, axarr = plt.subplots(len(iterations), figsize=(10, len(iterations) * 5))
-
-    experiment_filter = \
-        test_stat.columns.get_level_values('Experiment') == experiment
-
-    for ax, iteration in zip(axarr, iterations):
-        iteration_filter = \
-            test_stat.columns.get_level_values('Iteration') == str(iteration)
-
-        learner_filter = \
-            np.in1d(test_stat.columns.get_level_values('Learner'), learner_names)
-
-        mask = iteration_filter & learner_filter & experiment_filter
-        mean = (test_stat
-                .loc[:, mask]
-                .droplevel(['Experiment', 'Iteration'], axis=1)
-                )
-        stderr = (std
-                  .loc[:, mask]
-                  .fillna(0)
-                  .droplevel(['Experiment', 'Iteration'], axis=1)
-                  )
-        plot_line_graph_with_errors(
-            mean=mean,
-            stderr=stderr,
-            ax=ax
-        )
-        (test_stat_exact
-         .iloc[:, experiment]
-         .plot(color='k', lw=2, label='Exact', ax=ax))  # TODO!! hardcoded
-        ax.set(
-            title=f'Iteration {iteration}',
-            xlabel=None,
-            ylabel=TEST_STAT_ABBRV_STR
-        )
-        ax.legend()
-    axarr[-1].set_xlabel(THETA_STR)
-    return fig
-
-
 def analyse_mixtures_active_learning(
         results: Dict[str, List[NDFrame]],
         config: Dict
@@ -149,12 +99,15 @@ def analyse_mixtures_active_learning(
         test_stat_exact=test_stat_exact
     )
 
+    experiments = [0, 1, 2]
+    iterations = None
+
     debug_fig = _plot_debug_graph(
         test_stat=test_stat,
         std=std,
         test_stat_exact=test_stat_exact,
-        experiment=0,
-        iterations=[0, 1, 2, 3, 5, 10],
+        experiments=experiments,
+        iterations=iterations,
     )
     ucb_debug_fig = _plot_ucb_debug_graph(
         test_stat=test_stat,
@@ -163,8 +116,8 @@ def analyse_mixtures_active_learning(
         learner_name='UCB_0',
         kappas=[0, 15, -15],
         ns=[2, 3],
-        iterations=None,
-        experiments=[0, 1, 3, 4]
+        iterations=iterations,
+        experiments=experiments,
     )
 
     figures = dict(
@@ -174,6 +127,70 @@ def analyse_mixtures_active_learning(
     )
 
     return figures
+
+
+def _plot_debug_graph(
+        test_stat: pd.DataFrame,
+        std: pd.DataFrame,
+        test_stat_exact: pd.DataFrame,
+        experiments: List[int] = None,
+        iterations: List[int] = None,
+        learner_names: List[str] = None
+) -> Figure:
+    learner_names = learner_names \
+                    or test_stat.columns.get_level_values('Learner').unique()
+
+    def _plotting_func(
+            ax,
+            experiment,
+            iteration,
+            test_stat,
+            std,
+            test_stat_exact,
+            experiment_filter,
+            iteration_filter
+    ):
+        iteration_filter = \
+            test_stat.columns.get_level_values('Iteration') == str(iteration)
+
+        learner_filter = \
+            np.in1d(test_stat.columns.get_level_values('Learner'), learner_names)
+
+        mask = iteration_filter & learner_filter & experiment_filter
+        mean = (test_stat
+                .loc[:, mask]
+                .droplevel(['Experiment', 'Iteration'], axis=1)
+                )
+        stderr = (std
+                  .loc[:, mask]
+                  .fillna(0)
+                  .droplevel(['Experiment', 'Iteration'], axis=1)
+                  )
+        plot_line_graph_with_errors(
+            mean=mean,
+            stderr=stderr,
+            ax=ax
+        )
+        (test_stat_exact
+         .iloc[:, experiment]
+         .plot(color='k', lw=2, label='Exact', ax=ax))
+        ax.set(
+            title=f'Experiment {experiment} Iteration {iteration}',
+            xlabel=None,
+            ylabel=TEST_STAT_ABBRV_STR
+        )
+        ax.legend()
+
+    fig, _ = _plot_per_experiment_and_iter(
+        test_stat=test_stat,
+        std=std,
+        test_stat_exact=test_stat_exact,
+        iterations=iterations,
+        experiments=experiments,
+        plotting_func=_plotting_func
+    )
+
+    return fig
 
 
 def _plot_ucb_debug_graph(
@@ -186,24 +203,77 @@ def _plot_ucb_debug_graph(
         iterations: List[int] = None,
         experiments: List[int] = None,
 ) -> Figure:
+
+    def _plotting_func(
+            ax,
+            experiment,
+            iteration,
+            test_stat,
+            std,
+            test_stat_exact,
+            experiment_filter,
+            iteration_filter
+    ):
+        learner_filter = \
+            test_stat.columns.get_level_values('Learner') == learner_name
+        mask = iteration_filter & learner_filter & experiment_filter
+        mu = test_stat.loc[:, mask]
+        sigma = std.loc[:, mask]
+
+        kappa_df = pd.DataFrame({
+            kappa: (-mu + kappa * sigma).values.squeeze()
+            for kappa in kappas
+        },
+            index=mu.index
+        ).rename(lambda x: rf'$\kappa={x}$', axis=1)
+
+        n_df = pd.DataFrame({
+            n: (-mu + sigma ** n).values.squeeze()
+            for n in ns
+        },
+            index=mu.index
+        ).rename(lambda x: rf'$n={x}$', axis=1)
+
+        kappa_df.plot(ax=ax, ls='--')
+        n_df.plot(ax=ax)
+        (-1 * test_stat_exact.iloc[:, experiment]).plot(ax=ax, lw=2, label='Exact')
+        _plot_maxima(kappa_df, ax)
+        _plot_maxima(n_df, ax)
+
+        ax.legend(ncol=2)
+        ax.set(
+            xlabel=None,
+            title=f'Experiment {experiment} Iteration {iteration}'
+        )
+    fig, _ = _plot_per_experiment_and_iter(
+        test_stat=test_stat,
+        std=std,
+        test_stat_exact=test_stat_exact,
+        iterations=iterations,
+        experiments=experiments,
+        plotting_func=_plotting_func
+    )
+    return fig
+
+
+def _plot_per_experiment_and_iter(
+        test_stat: pd.DataFrame,
+        std: pd.DataFrame,
+        test_stat_exact: pd.DataFrame,
+        iterations: List[int],
+        experiments: List[int],
+        plotting_func: Callable
+):
     iterations = iterations or \
                  test_stat.columns.get_level_values('Iteration').unique()
     experiments = experiments or \
                   test_stat.columns.get_level_values('Experiment').unique()
-
-    learner_filter = \
-        test_stat.columns.get_level_values('Learner') == learner_name
 
     fig, axarr = plt.subplots(
         nrows=len(iterations),
         ncols=len(experiments),
         figsize=(10 * len(experiments), 5 * len(iterations))
     )
-
-    def _plot_maxima(df, ax):
-        for x, y in zip(df.idxmax(), df.max()):
-            ax.plot([x], [y], 'ko', ms=8)
-
     for i, experiment in enumerate(experiments):
         for j, iteration in enumerate(iterations):
             ax = axarr[j, i]
@@ -211,37 +281,22 @@ def _plot_ucb_debug_graph(
                 test_stat.columns.get_level_values('Experiment') == experiment
             iteration_filter = \
                 test_stat.columns.get_level_values('Iteration') == str(iteration)
-            mask = iteration_filter & learner_filter & experiment_filter
-            mu = test_stat.loc[:, mask]
-            sigma = std.loc[:, mask]
-
-            kappa_df = pd.DataFrame({
-                kappa: (-mu + kappa * sigma).values.squeeze()
-                for kappa in kappas
-            },
-                index=mu.index
-            ).rename(lambda x: rf'$\kappa={x}$', axis=1)
-
-            n_df = pd.DataFrame({
-                n: (-mu + sigma**n).values.squeeze()
-                for n in ns
-            },
-                index=mu.index
-            ).rename(lambda x: rf'$n={x}$', axis=1)
-
-            kappa_df.plot(ax=ax, ls='--')
-            n_df.plot(ax=ax)
-            (-1 * test_stat_exact.iloc[:, experiment]).plot(ax=ax, lw=2, label='Exact')
-            _plot_maxima(kappa_df, ax)
-            _plot_maxima(n_df, ax)
-
-            ax.legend(ncol=2)
-            ax.set(
-                xlabel=None,
-                title=f'Experiment {i} Iteration {j}'
+            plotting_func(
+                ax=ax,
+                experiment=experiment,
+                iteration=iteration,
+                test_stat=test_stat,
+                std=std,
+                test_stat_exact=test_stat_exact,
+                experiment_filter=experiment_filter,
+                iteration_filter=iteration_filter
             )
+    return fig, axarr
 
-    return fig
+
+def _plot_maxima(df, ax, **kwargs):
+    for x, y in zip(df.idxmax(), df.max()):
+        ax.plot([x], [y], **kwargs)
 
 
 def _aggregrate_nllr_predictions(
