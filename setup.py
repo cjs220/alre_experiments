@@ -7,7 +7,8 @@ setup(
         'util',
         'experiments',
         'experiments.mixtures_parameterized',
-        'experiments.mixtures_active_learning'
+        'experiments.mixtures_active_learning',
+	'experiments.mixtures_active_learning.mal_analysis'
     ],
     url='github.com/cjs220/alre_experiments',
     license='MIT',
