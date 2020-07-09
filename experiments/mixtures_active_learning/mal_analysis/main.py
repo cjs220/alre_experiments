@@ -42,10 +42,13 @@ def plot_total_mse(
         mean.loc[iteration, learner] = mean_mse_group
         stderr.loc[iteration, learner] = stderr_group
 
+    def _ensure_numeric(df):
+        return df.astype(np.float64).set_index(df.index.astype(np.float64))
+
     fig, ax = plt.subplots()
     plot_line_graph_with_errors(
-        mean=mean.astype(np.float64),
-        stderr=stderr.astype(np.float64),
+        mean=_ensure_numeric(mean),
+        stderr=_ensure_numeric(stderr),
         ax=ax
     )
     ax.set(title='Total MSE', xlabel='Active learning iteration')
@@ -104,7 +107,7 @@ def analyse_mixtures_active_learning(
     # *****************************
     experiments = [0, 1, 2]
     iterations = None
-    learner_names = ['UCB_0']
+    learner_names = ['UCBM_1.0']
 
     debug_fig = plot_debug_graph(
         test_stat=test_stat,
@@ -112,34 +115,34 @@ def analyse_mixtures_active_learning(
         test_stat_exact=test_stat_exact,
         experiments=experiments,
         iterations=iterations,
-        learner_names=learner_names
+        learner_names=None
     )
-    ucb_debug_fig = plot_ucb_debug_graph(
-        test_stat=test_stat,
-        std=std,
-        test_stat_exact=test_stat_exact,
-        learner_names=learner_names,
-        kappas=[0, 15, -15],
-        ns=[2, 3],
-        iterations=iterations,
-        experiments=experiments,
-    )
-    std_fig = _analyse_std(
-        test_stat=nllr,
-        std=std,
-        learner_names=learner_names,
-        iterations=iterations,
-        experiments=experiments,
-    )
-
-    af_fig = _plot_new_af(
-        test_stat=test_stat,
-        std=std,
-        kappas=[1, 2],
-        learner_names=learner_names,
-        experiments=experiments,
-        iterations=iterations
-    )
+    # ucb_debug_fig = plot_ucb_debug_graph(
+    #     test_stat=test_stat,
+    #     std=std,
+    #     test_stat_exact=test_stat_exact,
+    #     learner_names=learner_names,
+    #     kappas=[0, 15, -15],
+    #     ns=[2, 3],
+    #     iterations=iterations,
+    #     experiments=experiments,
+    # )
+    # std_fig = _analyse_std(
+    #     test_stat=nllr,
+    #     std=std,
+    #     learner_names=learner_names,
+    #     iterations=iterations,
+    #     experiments=experiments,
+    # )
+    #
+    # af_fig = _plot_new_af(
+    #     test_stat=test_stat,
+    #     std=std,
+    #     kappas=[1, 2],
+    #     learner_names=learner_names,
+    #     experiments=experiments,
+    #     iterations=iterations
+    # )
     # *****************************
 
     figures = dict(

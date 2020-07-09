@@ -31,7 +31,7 @@ class MultiExperimentPlotter:
                             self._get_default_col_vals(columns=columns, level='Iteration'))
         self.learner_names = (learner_names or
                               self._get_default_col_vals(columns=columns, level='Learner'))
-        self.learner_filter = np.in1d(columns.get_level_values('Learner'), learner_names)
+        self.learner_filter = np.in1d(columns.get_level_values('Learner'), self.learner_names)
 
     def __call__(self):
         fig, axarr = self._init_figure()
