@@ -78,6 +78,40 @@ def plot_final_iteration_test_stat(
     return fig
 
 
+def plot_trialed_thetas_hist(trialed_thetas: List[pd.DataFrame]):
+    pd.concat(trialed_thetas, axis=0).plot.hist(
+        subplots=True,
+        bins=80,
+        figsize=(10, 20),
+        ylim=(0, 150)
+    )
+    return plt.gcf()
+
+
+def plot_trialed_thetas_bar(trialed_thetas: List[pd.DataFrame]):
+    experiments = list(range(len(trialed_thetas)))
+    df = pd.concat(
+        trialed_thetas,
+        axis=1,
+        keys=experiments,
+        names=['Experiment', 'Learner']
+    )
+    learners = df.columns.get_level_values('Learner').unique()
+    fig, axarr = plt.subplots(
+        nrows=len(experiments),
+        ncols=len(learners),
+        figsize=(10 * len(learners), 5 * len(experiments))
+    )
+    for i, experiment in enumerate(experiments):
+        for j, learner in enumerate(learners):
+            ax = axarr[i, j]
+            data = df.loc[:, (experiment, learner)]
+            data.plot(ax=ax, marker='o')
+            ax.set(title=f'{learner} Experiment {experiment}')
+
+    return fig
+
+
 def analyse_mixtures_active_learning(
         results: Dict[str, List[NDFrame]],
         config: Dict
@@ -86,6 +120,10 @@ def analyse_mixtures_active_learning(
     nllr = _aggregrate_nllr_predictions(results['nllr'])
     std = _aggregrate_nllr_predictions(results['std'])
     nllr_exact = results['nllr_exact']
+    trialed_thetas = results['trialed_thetas']
+
+    trialed_thetas_hist = plot_trialed_thetas_hist(trialed_thetas=trialed_thetas)
+    trialed_thetas_bar = plot_trialed_thetas_bar(trialed_thetas=trialed_thetas)
 
     mle_err = pd.concat(
         [df.subtract(df['Exact'], axis=0).drop('Exact', axis=1) for df in mle],
@@ -106,7 +144,7 @@ def analyse_mixtures_active_learning(
 
     # *****************************
     experiments = [0, 1, 2]
-    iterations = None
+    iterations = np.linspace(0, 100, 11).astype(np.int64)
     learner_names = ['UCBM_1.0']
 
     debug_fig = plot_debug_graph(
@@ -117,38 +155,39 @@ def analyse_mixtures_active_learning(
         iterations=iterations,
         learner_names=None
     )
-    # ucb_debug_fig = plot_ucb_debug_graph(
-    #     test_stat=test_stat,
-    #     std=std,
-    #     test_stat_exact=test_stat_exact,
-    #     learner_names=learner_names,
-    #     kappas=[0, 15, -15],
-    #     ns=[2, 3],
-    #     iterations=iterations,
-    #     experiments=experiments,
-    # )
-    # std_fig = _analyse_std(
-    #     test_stat=nllr,
-    #     std=std,
-    #     learner_names=learner_names,
-    #     iterations=iterations,
-    #     experiments=experiments,
-    # )
-    #
-    # af_fig = _plot_new_af(
-    #     test_stat=test_stat,
-    #     std=std,
-    #     kappas=[1, 2],
-    #     learner_names=learner_names,
-    #     experiments=experiments,
-    #     iterations=iterations
-    # )
+    ucb_debug_fig = plot_ucb_debug_graph(
+        test_stat=test_stat,
+        std=std,
+        test_stat_exact=test_stat_exact,
+        learner_names=learner_names,
+        kappas=[0, 15, -15],
+        ns=[2, 3],
+        iterations=iterations,
+        experiments=experiments,
+    )
+    std_fig = _analyse_std(
+        test_stat=nllr,
+        std=std,
+        learner_names=learner_names,
+        iterations=iterations,
+        experiments=experiments,
+    )
+
+    af_fig = _plot_new_af(
+        test_stat=test_stat,
+        std=std,
+        kappas=[1, 2],
+        learner_names=learner_names,
+        experiments=experiments,
+        iterations=iterations
+    )
     # *****************************
 
     figures = dict(
         mle_err=mle_err_fig,
         mse=mse_fig,
-        test_stat=test_stat_fig
+        test_stat=test_stat_fig,
+        trialed_thetas=trialed_thetas_hist
     )
 
     return figures

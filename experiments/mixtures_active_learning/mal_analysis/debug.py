@@ -25,11 +25,11 @@ class MultiExperimentPlotter:
                  ):
         self.plotting_func = plotting_func
         self.columns = columns
-        self.iterations = (iterations or
+        self.iterations = (iterations if iterations is not None else
                            self._get_default_col_vals(columns=columns, level='Iteration'))
-        self.experiments = (experiments or
+        self.experiments = (experiments if iterations is not None else
                             self._get_default_col_vals(columns=columns, level='Iteration'))
-        self.learner_names = (learner_names or
+        self.learner_names = (learner_names if learner_names is not None else
                               self._get_default_col_vals(columns=columns, level='Learner'))
         self.learner_filter = np.in1d(columns.get_level_values('Learner'), self.learner_names)
 
