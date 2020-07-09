@@ -4,9 +4,14 @@ import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
 from matplotlib.figure import Figure
+from sklearn.linear_model import LinearRegression
 
 from experiments.mixtures_parameterized.mp_analysis import TEST_STAT_ABBRV_STR
 from util.plotting import plot_line_graph_with_errors
+
+MU = r'$\mu$'
+SIGMA = r'$\sigma$'
+LOG_SIGMA = r'$\log \sigma$'
 
 
 class MultiExperimentPlotter:
@@ -36,7 +41,7 @@ class MultiExperimentPlotter:
                 experiment_filter = self._filter_on_experiment(experiment)
                 iteration_filter = self._filter_on_iteration(iteration)
                 mask = experiment_filter & iteration_filter & self.learner_filter
-                self.plotting_func(ax=ax, mask=mask)
+                self.plotting_func(ax=ax, mask=mask, experiment=experiment, iteration=iteration)
                 ax.set(
                     xlabel=None,
                     title=f'Experiment {experiment} Iteration {iteration}'
@@ -78,23 +83,7 @@ def plot_debug_graph(
         iterations: List[int] = None,
         learner_names: List[str] = None
 ) -> Figure:
-    learner_names = learner_names \
-                    or test_stat.columns.get_level_values('Learner').unique()
-
-    def _plotting_func(
-            ax,
-            experiment,
-            iteration,
-            test_stat,
-            std,
-            test_stat_exact,
-            experiment_filter,
-            iteration_filter
-    ):
-        learner_filter = \
-            np.in1d(test_stat.columns.get_level_values('Learner'), learner_names)
-
-        mask = iteration_filter & learner_filter & experiment_filter
+    def _plotting_func(ax, mask, experiment, **kwargs):
         mean = (test_stat
                 .loc[:, mask]
                 .droplevel(['Experiment', 'Iteration'], axis=1)
@@ -112,21 +101,17 @@ def plot_debug_graph(
         (test_stat_exact
          .iloc[:, experiment]
          .plot(color='k', lw=2, label='Exact', ax=ax))
-        ax.set(
-            title=f'Experiment {experiment} Iteration {iteration}',
-            xlabel=None,
-            ylabel=TEST_STAT_ABBRV_STR
-        )
+        ax.set(ylabel=TEST_STAT_ABBRV_STR)
         ax.legend()
 
-    fig, _ = _plot_per_experiment_and_iter(
-        test_stat=test_stat,
-        std=std,
-        test_stat_exact=test_stat_exact,
+    plotter = MultiExperimentPlotter(
+        plotting_func=_plotting_func,
+        columns=test_stat.columns,
         iterations=iterations,
         experiments=experiments,
-        plotting_func=_plotting_func
+        learner_names=learner_names
     )
+    fig, _ = plotter()
 
     return fig
 
@@ -135,25 +120,13 @@ def plot_ucb_debug_graph(
         test_stat: pd.DataFrame,
         std: pd.DataFrame,
         test_stat_exact: pd.DataFrame,
-        learner_name: str,
         kappas: List[float],
         ns: List[int],
+        learner_names: List[str] = None,
         iterations: List[int] = None,
         experiments: List[int] = None,
 ) -> Figure:
-    def _plotting_func(
-            ax,
-            experiment,
-            iteration,
-            test_stat,
-            std,
-            test_stat_exact,
-            experiment_filter,
-            iteration_filter
-    ):
-        learner_filter = \
-            test_stat.columns.get_level_values('Learner') == learner_name
-        mask = iteration_filter & learner_filter & experiment_filter
+    def _plotting_func(ax, mask, experiment, iteration):
         mu = test_stat.loc[:, mask]
         sigma = std.loc[:, mask]
 
@@ -178,40 +151,10 @@ def plot_ucb_debug_graph(
         _plot_maxima(n_df, ax)
 
         ax.legend(ncol=2)
-        ax.set(
-            xlabel=None,
-            title=f'Experiment {experiment} Iteration {iteration}'
-        )
-
-    fig, _ = _plot_per_experiment_and_iter(
-        test_stat=test_stat,
-        std=std,
-        test_stat_exact=test_stat_exact,
-        iterations=iterations,
-        experiments=experiments,
-        plotting_func=_plotting_func
-    )
-    return fig
-
-
-def _analyse_std(
-        nllr: pd.DataFrame,
-        std: pd.DataFrame,
-        learner_names: List[str] = None,
-        experiments: List[int] = None,
-        iterations: List[int] = None,
-):
-    def _plotting_func(ax, mask):
-        mu = nllr.loc[:, mask]
-        sigma = std.loc[:, mask]
-        fractional_sigma = ((sigma / mu.abs())
-                            .droplevel(['Iteration', 'Experiment'], axis=1)
-                            )
-        fractional_sigma.plot(ax=ax)
 
     plotter = MultiExperimentPlotter(
         plotting_func=_plotting_func,
-        columns=nllr.columns,
+        columns=test_stat.columns,
         iterations=iterations,
         experiments=experiments,
         learner_names=learner_names
@@ -221,42 +164,77 @@ def _analyse_std(
     return fig
 
 
-def _plot_per_experiment_and_iter(
+def _analyse_std(
         test_stat: pd.DataFrame,
         std: pd.DataFrame,
-        test_stat_exact: pd.DataFrame,
-        iterations: List[int],
-        experiments: List[int],
-        plotting_func: Callable
+        learner_names: List[str] = None,
+        experiments: List[int] = None,
+        iterations: List[int] = None,
 ):
-    iterations = iterations or \
-                 test_stat.columns.get_level_values('Iteration').unique()
-    experiments = experiments or \
-                  test_stat.columns.get_level_values('Experiment').unique()
+    assert len(learner_names) == 1
 
-    fig, axarr = plt.subplots(
-        nrows=len(iterations),
-        ncols=len(experiments),
-        figsize=(10 * len(experiments), 5 * len(iterations))
+    def _plotting_func(ax, mask, **kwargs):
+        mu = test_stat.loc[:, mask]
+        sigma = std.loc[:, mask]
+        sigma_mu = pd.concat(
+            [mu, sigma],
+            keys=[MU, SIGMA],
+            axis=1
+        ).droplevel(['Experiment', 'Iteration', 'Learner'], axis=1)
+        sigma_mu.reset_index().plot.scatter(
+            ax=ax,
+            x='theta',
+            y=SIGMA,
+            s=sigma_mu[MU].values,
+            alpha=0.5,
+        )
+
+    plotter = MultiExperimentPlotter(
+        plotting_func=_plotting_func,
+        columns=test_stat.columns,
+        iterations=iterations,
+        experiments=experiments,
+        learner_names=learner_names
     )
-    for i, experiment in enumerate(experiments):
-        for j, iteration in enumerate(iterations):
-            ax = axarr[j, i]
-            experiment_filter = \
-                test_stat.columns.get_level_values('Experiment') == experiment
-            iteration_filter = \
-                test_stat.columns.get_level_values('Iteration') == str(iteration)
-            plotting_func(
-                ax=ax,
-                experiment=experiment,
-                iteration=iteration,
-                test_stat=test_stat,
-                std=std,
-                test_stat_exact=test_stat_exact,
-                experiment_filter=experiment_filter,
-                iteration_filter=iteration_filter
-            )
-    return fig, axarr
+
+    fig, _ = plotter()
+    return fig
+
+
+def _plot_new_af(
+        test_stat: pd.DataFrame,
+        std: pd.DataFrame,
+        kappas: List[int],
+        learner_names: List[str] = None,
+        experiments: List[int] = None,
+        iterations: List[int] = None,
+):
+    def _plotting_func(ax, mask, **kwargs):
+        mu = test_stat.loc[:, mask]
+        sigma = std.loc[:, mask]
+        af = pd.concat([
+            sigma / (1 + mu / (sigma * kappa))
+            for kappa in kappas],
+            axis=1,
+            keys=kappas,
+            names=[r'$\kappa$']
+        ).droplevel(['Experiment', 'Iteration'], axis=1)
+        scaled_af = af / af.max(axis=0)
+        scaled_test_stat = mu / mu.max(axis=0)
+        scaled_test_stat = scaled_test_stat.droplevel(['Experiment', 'Iteration'], axis=1)
+        scaled_af.plot(ax=ax)
+        scaled_test_stat.plot(ax=ax)
+
+    plotter = MultiExperimentPlotter(
+        plotting_func=_plotting_func,
+        columns=test_stat.columns,
+        iterations=iterations,
+        experiments=experiments,
+        learner_names=learner_names
+    )
+
+    fig, _ = plotter()
+    return fig
 
 
 def _plot_maxima(df, ax, **kwargs):

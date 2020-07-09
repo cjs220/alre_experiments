@@ -7,7 +7,7 @@ from matplotlib.figure import Figure
 from pandas.core.generic import NDFrame
 
 from experiments.mixtures_active_learning.mal_analysis.debug import plot_debug_graph, plot_ucb_debug_graph, \
-    _analyse_std
+    _analyse_std, _plot_new_af
 from experiments.mixtures_parameterized.mp_analysis import TEST_STAT_ABBRV_STR, THETA_STR
 from util.plotting import plot_line_graph_with_errors
 
@@ -101,35 +101,44 @@ def analyse_mixtures_active_learning(
         test_stat_exact=test_stat_exact
     )
 
+    # *****************************
     experiments = [0, 1, 2]
     iterations = None
     learner_names = ['UCB_0']
 
-    # *****************************
     debug_fig = plot_debug_graph(
         test_stat=test_stat,
         std=std,
         test_stat_exact=test_stat_exact,
         experiments=experiments,
         iterations=iterations,
+        learner_names=learner_names
     )
     ucb_debug_fig = plot_ucb_debug_graph(
         test_stat=test_stat,
         std=std,
         test_stat_exact=test_stat_exact,
-        learner_name='UCB_0',
+        learner_names=learner_names,
         kappas=[0, 15, -15],
         ns=[2, 3],
         iterations=iterations,
         experiments=experiments,
     )
-
     std_fig = _analyse_std(
-        nllr=nllr,
+        test_stat=nllr,
         std=std,
         learner_names=learner_names,
         iterations=iterations,
         experiments=experiments,
+    )
+
+    af_fig = _plot_new_af(
+        test_stat=test_stat,
+        std=std,
+        kappas=[1, 2],
+        learner_names=learner_names,
+        experiments=experiments,
+        iterations=iterations
     )
     # *****************************
 
