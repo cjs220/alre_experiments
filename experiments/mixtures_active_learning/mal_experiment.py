@@ -7,7 +7,7 @@ import pandas as pd
 from pandas.core.generic import NDFrame
 
 from active_learning_ratio_estimation.active_learning.active_learner import UpperConfidenceBoundLearner, \
-    RandomActiveLearner
+    RandomActiveLearner, ModifiedUCBLearner
 from active_learning_ratio_estimation.dataset import ParamGrid
 from active_learning_ratio_estimation.model import FlipoutClassifier, SinglyParameterizedRatioModel
 from active_learning_ratio_estimation.model.ratio_model import exact_param_scan
@@ -33,6 +33,7 @@ def run_mixtures_active_learning(
         n_samples_per_theta: int,
         n_iter: int,
         ucb_kappas: List[float],
+        ucbm_kappas: List[float],
         logger: Logger = None
 ) -> Dict[str, NDFrame]:
     logger = logger or logging.getLogger(__name__)
@@ -48,31 +49,26 @@ def run_mixtures_active_learning(
         to_meshgrid_shape=False
     )
 
-    active_learners = dict(
-        Random=RandomActiveLearner(
-            simulator_func=triple_mixture,
-            X_true=X_true,
-            theta_true=theta_true,
-            theta_0=theta_0,
-            initial_idx=initial_idx,
-            n_samples_per_theta=n_samples_per_theta,
-            ratio_model=create_model(theta_0=theta_0, hyperparams=hyperparams),
-            total_param_grid=param_grid,
-        ),
+    logger.info('Building active learners')
+    learner_kwargs = dict(
+        simulator_func=triple_mixture,
+        X_true=X_true,
+        theta_true=theta_true,
+        theta_0=theta_0,
+        initial_idx=initial_idx,
+        n_samples_per_theta=n_samples_per_theta,
+        ratio_model=create_model(theta_0=theta_0, hyperparams=hyperparams),
+        total_param_grid=param_grid,
     )
+    active_learners = dict(Random=RandomActiveLearner(**learner_kwargs))
 
     for ucb_kappa in ucb_kappas:
-        active_learners[f'UCB_{ucb_kappa}'] = UpperConfidenceBoundLearner(
-            simulator_func=triple_mixture,
-            X_true=X_true,
-            theta_true=theta_true,
-            theta_0=theta_0,
-            initial_idx=initial_idx,
-            n_samples_per_theta=n_samples_per_theta,
-            ratio_model=create_model(theta_0=theta_0, hyperparams=hyperparams),
-            total_param_grid=param_grid,
-            ucb_kappa=ucb_kappa
-        )
+        active_learners[f'UCB_{ucb_kappa}'] = \
+            UpperConfidenceBoundLearner(kappa=ucb_kappa, **learner_kwargs)
+
+    for ucbm_kappa in ucbm_kappas:
+        active_learners[f'UCBM_{ucbm_kappa}'] = \
+            ModifiedUCBLearner(kappa=ucbm_kappa, **learner_kwargs)
 
     logger.info('Fitting ActiveLearners.')
     for name, active_learner in active_learners.items():
