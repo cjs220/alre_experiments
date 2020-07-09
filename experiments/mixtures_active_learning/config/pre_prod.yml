@@ -13,7 +13,8 @@ hyperparams:
   fit_batch_size: 32
   predict_batch_size: 32
 
-n_true: 500
-n_samples_per_theta: 100
-n_iter: 10
-ucb_kappas: [0, 1.0, 2.5, 7.5, 10]
+n_true: 100
+n_samples_per_theta: 10
+n_iter: 100
+ucb_kappas: [1.0, 2.5]
+ucbm_kappas: [1.0, 2.5]
