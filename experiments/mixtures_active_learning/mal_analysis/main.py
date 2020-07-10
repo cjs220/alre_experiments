@@ -7,18 +7,49 @@ from matplotlib.figure import Figure
 from pandas.core.generic import NDFrame
 
 from experiments.mixtures_active_learning.mal_analysis.debug import \
-    plot_debug_graph, plot_ucb_debug_graph, _analyse_std, _plot_new_af
+    plot_debug_graph, _analyse_std
 from experiments.mixtures_parameterized.mp_analysis import \
     TEST_STAT_ABBRV_STR, THETA_STR
 from util.plotting import plot_line_graph_with_errors
 
 
-def plot_mle_error(mle_err) -> Figure:
-    fig, ax = plt.subplots()
+def plot_mle_error(
+        mle: List[pd.DataFrame],
+        learner_names: List[str] = None,
+        plot_median: bool = True,
+        plot_rolling_median: bool = True
+) -> Figure:
+    learner_names = learner_names or slice(None)
+    mle_err = pd.concat(
+        [df.subtract(df['Exact'], axis=0).drop('Exact', axis=1) for df in mle],
+        axis=1,
+        keys=range(len(mle))
+    ).abs()
+    mle_err = mle_err.loc[:, (slice(None), learner_names)]
+
+    nrows = 1 + plot_median + plot_rolling_median
+    fig, axarr = plt.subplots(nrows=nrows, figsize=(10, nrows * 5), sharex=True)
+    if nrows == 1:
+        axarr = np.array([axarr])
+
     mean = mle_err.mean(axis=1, level=1)
     stderr = mle_err.sem(axis=1, level=1)
-    plot_line_graph_with_errors(mean=mean, stderr=stderr, ax=ax)
-    ax.set(title='MAE on MLE estimate')
+    median = mle_err.mean(axis=1, level=1)
+
+    plot_line_graph_with_errors(mean=mean, stderr=stderr, ax=axarr[0])
+    axarr[0].set(title='Mean absolute error on MLE estimate')
+
+    if plot_median:
+        ax = axarr[1]
+        median.plot(ax=ax)
+        ax.set(title='Median absolute error on MLE estimate')
+
+    if plot_rolling_median:
+        ax = axarr[-1]
+        median.rolling(10).mean().plot(ax=ax)
+        ax.set(title='Rolling (10) median absolute error on MLE estimate')
+
+    axarr[-1].set(xlabel='Active learning iteration')
     return fig
 
 
@@ -94,25 +125,27 @@ def plot_trialed_thetas_hist(trialed_thetas: List[pd.DataFrame]):
     return plt.gcf()
 
 
-def plot_trialed_thetas_bar(
+def plot_theta_convergence(
         trialed_thetas: List[pd.DataFrame],
-        mle: List[pd.DataFrame]
+        mle: List[pd.DataFrame],
+        learner_names: List[str] = None,
+        experiments: List[int] = None
 ):
-    experiments = list(range(len(trialed_thetas)))
+    experiments = experiments or list(range(len(trialed_thetas)))
 
     def _concat(list_df):
         return pd.concat(
             list_df,
             axis=1,
-            keys=experiments,
+            keys=range(len(trialed_thetas)),
             names=['Experiment', 'Learner']
         )
 
     trialed_df = _concat(trialed_thetas)
     mle_df = _concat(mle)
-    mle_exact = mle_df. \
-                    loc[:, (slice(None), 'Exact')] \
-        .droplevel('Learner', axis=1)
+    mle_exact = (mle_df.
+                 loc[:, (slice(None), 'Exact')]
+                 .droplevel('Learner', axis=1))
     mle_df = mle_df.drop('Exact', axis=1, level='Learner')
     all_df = pd.concat(
         [trialed_df, mle_df],
@@ -121,20 +154,21 @@ def plot_trialed_thetas_bar(
         names=['Quantity']
     )
 
-    learners = all_df.columns.get_level_values('Learner').unique()
+    if learner_names is None:
+        learner_names = all_df.columns.get_level_values('Learner').unique()
 
     fig, axarr = plt.subplots(
         nrows=len(experiments),
-        ncols=len(learners),
-        figsize=(10 * len(learners), 5 * len(experiments))
+        ncols=len(learner_names),
+        figsize=(10 * len(learner_names), 5 * len(experiments))
     )
 
     for i, experiment in enumerate(experiments):
-        for j, learner in enumerate(learners):
+        for j, learner in enumerate(learner_names):
             ax = axarr[i, j]
-            data = all_df \
-                       .loc[:, (slice(None), experiment, learner)] \
-                .droplevel(['Experiment', 'Learner'], axis=1)
+            data = (all_df
+                    .loc[:, (slice(None), experiment, learner)]
+                    .droplevel(['Experiment', 'Learner'], axis=1))
             data.plot(ax=ax, marker='o')
             mle_exact.loc[:, experiment].plot(ax=ax, label='Exact MLE')
             ax.set(title=f'{learner} Experiment {experiment}')
@@ -147,34 +181,27 @@ def analyse_mixtures_active_learning(
         results: Dict[str, List[NDFrame]],
         config: Dict
 ):
+    # Loading and preprocessing
     mle = results['mle']
     nllr = _aggregrate_nllr_predictions(results['nllr'])
     std = _aggregrate_nllr_predictions(results['std'])
     nllr_exact = results['nllr_exact']
     trialed_thetas = results['trialed_thetas']
-
-    trialed_thetas_hist = plot_trialed_thetas_hist(
-        trialed_thetas=trialed_thetas
-    )
-    trialed_thetas_bar = plot_trialed_thetas_bar(
-        trialed_thetas=trialed_thetas,
-        mle=mle
-    )
-
-    mle_err = pd.concat(
-        [df.subtract(df['Exact'], axis=0).drop('Exact', axis=1) for df in mle],
-        axis=1,
-        keys=range(len(mle))
-    ).abs()
-    mle_err_fig = plot_mle_error(mle_err)
-
     test_stat = _calc_test_stat(nllr)
     test_stat_exact = pd.concat(map(_calc_test_stat, nllr_exact), axis=1)
     test_stat_exact.columns = range(len(nllr_exact))
 
+    experiments = [0, 1, 2]
+    iterations = np.linspace(0, 100, 11).astype(np.int64)
+    learner_names = ['Random', 'UCBM_1.0', 'UCBM_2.5']
+
+    mle_err_fig = plot_mle_error(
+        mle=mle,
+        learner_names=learner_names
+    )
     mse_fig = plot_total_mse(
         test_stat=test_stat,
-        test_stat_exact=test_stat_exact
+        test_stat_exact=test_stat_exact,
     )
     test_stat_fig = plot_final_iteration_test_stat(
         test_stat=test_stat,
@@ -182,10 +209,15 @@ def analyse_mixtures_active_learning(
     )
 
     # *****************************
-    experiments = [0, 1, 2]
-    iterations = np.linspace(0, 100, 11).astype(np.int64)
-    learner_names = ['UCBM_1.0']
-
+    trialed_thetas_hist = plot_trialed_thetas_hist(
+        trialed_thetas=trialed_thetas
+    )
+    convergence_plot = plot_theta_convergence(
+        trialed_thetas=trialed_thetas,
+        mle=mle,
+        learner_names=learner_names,
+        experiments=None
+    )
     debug_fig = plot_debug_graph(
         test_stat=test_stat,
         std=std,
@@ -194,34 +226,15 @@ def analyse_mixtures_active_learning(
         iterations=iterations,
         learner_names=None
     )
-    ucb_debug_fig = plot_ucb_debug_graph(
-        test_stat=test_stat,
-        std=std,
-        test_stat_exact=test_stat_exact,
-        learner_names=learner_names,
-        kappas=[0, 15, -15],
-        ns=[2, 3],
-        iterations=iterations,
-        experiments=experiments,
-    )
     std_fig = _analyse_std(
         test_stat=nllr,
         std=std,
-        learner_names=learner_names,
+        learner_names=['UCBM_1.0'],
         iterations=iterations,
         experiments=experiments,
     )
 
-    af_fig = _plot_new_af(
-        test_stat=test_stat,
-        std=std,
-        kappas=[1, 2],
-        learner_names=learner_names,
-        experiments=experiments,
-        iterations=iterations
-    )
-    # *****************************
-
+    # Collect figures
     figures = dict(
         mle_err=mle_err_fig,
         mse=mse_fig,
@@ -239,7 +252,7 @@ def _aggregrate_nllr_predictions(
         learners = df['Learner'].unique()
         return pd.concat(
             [df[df['Learner'] == learner].drop('Learner', axis=1)
-            for learner in learners],
+             for learner in learners],
             axis=1,
             keys=learners
         )
