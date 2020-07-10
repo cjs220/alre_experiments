@@ -4,7 +4,6 @@ import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
 from matplotlib.figure import Figure
-from sklearn.linear_model import LinearRegression
 
 from experiments.mixtures_parameterized.mp_analysis import TEST_STAT_ABBRV_STR
 from util.plotting import plot_line_graph_with_errors
@@ -25,13 +24,21 @@ class MultiExperimentPlotter:
                  ):
         self.plotting_func = plotting_func
         self.columns = columns
-        self.iterations = (iterations if iterations is not None else
-                           self._get_default_col_vals(columns=columns, level='Iteration'))
-        self.experiments = (experiments if iterations is not None else
-                            self._get_default_col_vals(columns=columns, level='Iteration'))
-        self.learner_names = (learner_names if learner_names is not None else
-                              self._get_default_col_vals(columns=columns, level='Learner'))
-        self.learner_filter = np.in1d(columns.get_level_values('Learner'), self.learner_names)
+
+        def _get_default_if_none(_list, level):
+            if _list is None:
+                return self._get_default_col_vals(columns=columns, level=level)
+            else:
+                return _list
+
+        self.iterations = _get_default_if_none(iterations, 'Iteration')
+        self.experiments = _get_default_if_none(experiments, 'Experiment')
+        self.learner_names = _get_default_if_none(learner_names, 'Learner')
+
+        self.learner_filter = np.in1d(
+            columns.get_level_values('Learner'),
+            self.learner_names
+        )
 
     def __call__(self):
         fig, axarr = self._init_figure()
@@ -40,8 +47,15 @@ class MultiExperimentPlotter:
                 ax = axarr[j, i]
                 experiment_filter = self._filter_on_experiment(experiment)
                 iteration_filter = self._filter_on_iteration(iteration)
-                mask = experiment_filter & iteration_filter & self.learner_filter
-                self.plotting_func(ax=ax, mask=mask, experiment=experiment, iteration=iteration)
+                mask = (experiment_filter
+                        & iteration_filter
+                        & self.learner_filter)
+                self.plotting_func(
+                    ax=ax,
+                    mask=mask,
+                    experiment=experiment,
+                    iteration=iteration
+                )
                 ax.set(
                     xlabel=None,
                     title=f'Experiment {experiment} Iteration {iteration}'
@@ -126,6 +140,7 @@ def plot_ucb_debug_graph(
         iterations: List[int] = None,
         experiments: List[int] = None,
 ) -> Figure:
+    # TODO: remove / replace this fn
     def _plotting_func(ax, mask, experiment, iteration):
         mu = test_stat.loc[:, mask]
         sigma = std.loc[:, mask]
@@ -146,10 +161,10 @@ def plot_ucb_debug_graph(
 
         kappa_df.plot(ax=ax, ls='--')
         n_df.plot(ax=ax)
-        (-1 * test_stat_exact.iloc[:, experiment]).plot(ax=ax, lw=2, label='Exact')
+        exact = (-1 * test_stat_exact.iloc[:, experiment])
+        exact.plot(ax=ax, lw=2, label='Exact')
         _plot_maxima(kappa_df, ax)
         _plot_maxima(n_df, ax)
-
         ax.legend(ncol=2)
 
     plotter = MultiExperimentPlotter(
@@ -221,7 +236,10 @@ def _plot_new_af(
         ).droplevel(['Experiment', 'Iteration'], axis=1)
         scaled_af = af / af.max(axis=0)
         scaled_test_stat = mu / mu.max(axis=0)
-        scaled_test_stat = scaled_test_stat.droplevel(['Experiment', 'Iteration'], axis=1)
+        scaled_test_stat = scaled_test_stat.droplevel(
+            ['Experiment', 'Iteration'],
+            axis=1
+        )
         scaled_af.plot(ax=ax)
         scaled_test_stat.plot(ax=ax)
 

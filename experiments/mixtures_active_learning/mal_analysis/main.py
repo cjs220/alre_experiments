@@ -6,9 +6,10 @@ import pandas as pd
 from matplotlib.figure import Figure
 from pandas.core.generic import NDFrame
 
-from experiments.mixtures_active_learning.mal_analysis.debug import plot_debug_graph, plot_ucb_debug_graph, \
-    _analyse_std, _plot_new_af
-from experiments.mixtures_parameterized.mp_analysis import TEST_STAT_ABBRV_STR, THETA_STR
+from experiments.mixtures_active_learning.mal_analysis.debug import \
+    plot_debug_graph, plot_ucb_debug_graph, _analyse_std, _plot_new_af
+from experiments.mixtures_parameterized.mp_analysis import \
+    TEST_STAT_ABBRV_STR, THETA_STR
 from util.plotting import plot_line_graph_with_errors
 
 
@@ -62,11 +63,16 @@ def plot_final_iteration_test_stat(
 ) -> Figure:
     alpha = 0.2
     learners = test_stat.columns.get_level_values('Learner').unique()
-    fig, axarr = plt.subplots(nrows=len(learners), figsize=(10, 2.5 * len(learners)))
+    fig, axarr = plt.subplots(
+        nrows=len(learners),
+        figsize=(10, 2.5 * len(learners))
+    )
     ax_list = np.ravel(axarr).tolist()
     gb = test_stat.groupby(level='Learner', axis=1)
     for i, learner_name in enumerate(gb.groups.keys()):
-        test_stat_group = gb.get_group(learner_name).droplevel(level='Learner', axis=1)
+        test_stat_group = (gb
+                           .get_group(learner_name)
+                           .droplevel(level='Learner', axis=1))
         ax = ax_list[i]
         test_stat_group.plot(ax=ax, alpha=alpha, color='r')
         test_stat_exact.plot(ax=ax, alpha=alpha, color='b')
@@ -88,26 +94,51 @@ def plot_trialed_thetas_hist(trialed_thetas: List[pd.DataFrame]):
     return plt.gcf()
 
 
-def plot_trialed_thetas_bar(trialed_thetas: List[pd.DataFrame]):
+def plot_trialed_thetas_bar(
+        trialed_thetas: List[pd.DataFrame],
+        mle: List[pd.DataFrame]
+):
     experiments = list(range(len(trialed_thetas)))
-    df = pd.concat(
-        trialed_thetas,
+
+    def _concat(list_df):
+        return pd.concat(
+            list_df,
+            axis=1,
+            keys=experiments,
+            names=['Experiment', 'Learner']
+        )
+
+    trialed_df = _concat(trialed_thetas)
+    mle_df = _concat(mle)
+    mle_exact = mle_df. \
+                    loc[:, (slice(None), 'Exact')] \
+        .droplevel('Learner', axis=1)
+    mle_df = mle_df.drop('Exact', axis=1, level='Learner')
+    all_df = pd.concat(
+        [trialed_df, mle_df],
         axis=1,
-        keys=experiments,
-        names=['Experiment', 'Learner']
+        keys=[r'Trialed $\theta$', 'MLE'],
+        names=['Quantity']
     )
-    learners = df.columns.get_level_values('Learner').unique()
+
+    learners = all_df.columns.get_level_values('Learner').unique()
+
     fig, axarr = plt.subplots(
         nrows=len(experiments),
         ncols=len(learners),
         figsize=(10 * len(learners), 5 * len(experiments))
     )
+
     for i, experiment in enumerate(experiments):
         for j, learner in enumerate(learners):
             ax = axarr[i, j]
-            data = df.loc[:, (experiment, learner)]
+            data = all_df \
+                       .loc[:, (slice(None), experiment, learner)] \
+                .droplevel(['Experiment', 'Learner'], axis=1)
             data.plot(ax=ax, marker='o')
+            mle_exact.loc[:, experiment].plot(ax=ax, label='Exact MLE')
             ax.set(title=f'{learner} Experiment {experiment}')
+            ax.legend()
 
     return fig
 
@@ -122,8 +153,13 @@ def analyse_mixtures_active_learning(
     nllr_exact = results['nllr_exact']
     trialed_thetas = results['trialed_thetas']
 
-    trialed_thetas_hist = plot_trialed_thetas_hist(trialed_thetas=trialed_thetas)
-    trialed_thetas_bar = plot_trialed_thetas_bar(trialed_thetas=trialed_thetas)
+    trialed_thetas_hist = plot_trialed_thetas_hist(
+        trialed_thetas=trialed_thetas
+    )
+    trialed_thetas_bar = plot_trialed_thetas_bar(
+        trialed_thetas=trialed_thetas,
+        mle=mle
+    )
 
     mle_err = pd.concat(
         [df.subtract(df['Exact'], axis=0).drop('Exact', axis=1) for df in mle],
@@ -136,7 +172,10 @@ def analyse_mixtures_active_learning(
     test_stat_exact = pd.concat(map(_calc_test_stat, nllr_exact), axis=1)
     test_stat_exact.columns = range(len(nllr_exact))
 
-    mse_fig = plot_total_mse(test_stat=test_stat, test_stat_exact=test_stat_exact)
+    mse_fig = plot_total_mse(
+        test_stat=test_stat,
+        test_stat_exact=test_stat_exact
+    )
     test_stat_fig = plot_final_iteration_test_stat(
         test_stat=test_stat,
         test_stat_exact=test_stat_exact
@@ -199,7 +238,8 @@ def _aggregrate_nllr_predictions(
     def _add_learner_level(df):
         learners = df['Learner'].unique()
         return pd.concat(
-            [df[df['Learner'] == learner].drop('Learner', axis=1) for learner in learners],
+            [df[df['Learner'] == learner].drop('Learner', axis=1)
+            for learner in learners],
             axis=1,
             keys=learners
         )
@@ -216,5 +256,3 @@ def _aggregrate_nllr_predictions(
 
 def _calc_test_stat(nllr: pd.DataFrame) -> pd.DataFrame:
     return 2 * (nllr - nllr.min())
-
-
