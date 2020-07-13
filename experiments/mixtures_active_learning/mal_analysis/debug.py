@@ -89,7 +89,7 @@ class MultiExperimentPlotter:
         return columns.get_level_values(level=level) == value
 
 
-def plot_debug_graph(
+def plot_predictions(
         test_stat: pd.DataFrame,
         std: pd.DataFrame,
         test_stat_exact: pd.DataFrame,

@@ -6,8 +6,10 @@ import pandas as pd
 from matplotlib.figure import Figure
 from pandas.core.generic import NDFrame
 
+idx = pd.IndexSlice
+
 from experiments.mixtures_active_learning.mal_analysis.debug import \
-    plot_debug_graph, _analyse_std
+    plot_predictions, _analyse_std
 from experiments.mixtures_parameterized.mp_analysis import \
     TEST_STAT_ABBRV_STR, THETA_STR
 from util.plotting import plot_line_graph_with_errors
@@ -17,7 +19,7 @@ def plot_mle_error(
         mle: List[pd.DataFrame],
         learner_names: List[str] = None,
         plot_median: bool = True,
-        plot_rolling_median: bool = True
+        rolling: int = 50,
 ) -> Figure:
     learner_names = learner_names or slice(None)
     mle_err = pd.concat(
@@ -27,27 +29,27 @@ def plot_mle_error(
     ).abs()
     mle_err = mle_err.loc[:, (slice(None), learner_names)]
 
-    nrows = 1 + plot_median + plot_rolling_median
-    fig, axarr = plt.subplots(nrows=nrows, figsize=(10, nrows * 5), sharex=True)
-    if nrows == 1:
-        axarr = np.array([axarr])
+    nrows = 2 * (1 + plot_median)
+    fig, axarr = plt.subplots(nrows=nrows, figsize=(10, nrows * 5))
 
     mean = mle_err.mean(axis=1, level=1)
     stderr = mle_err.sem(axis=1, level=1)
-    median = mle_err.mean(axis=1, level=1)
-
     plot_line_graph_with_errors(mean=mean, stderr=stderr, ax=axarr[0])
     axarr[0].set(title='Mean absolute error on MLE estimate')
 
+    rolling_mean = mean.rolling(rolling).mean()
+    rolling_stderr = stderr.rolling(rolling).mean()
+    plot_line_graph_with_errors(mean=rolling_mean, stderr=rolling_stderr, ax=axarr[1])
+    axarr[1].set(title=f'Rolling ({rolling}) mean mean absolute error on MLE estimate')
+
     if plot_median:
-        ax = axarr[1]
+        median = mle_err.mean(axis=1, level=1)
+        ax = axarr[2]
         median.plot(ax=ax)
         ax.set(title='Median absolute error on MLE estimate')
-
-    if plot_rolling_median:
-        ax = axarr[-1]
-        median.rolling(10).mean().plot(ax=ax)
-        ax.set(title='Rolling (10) median absolute error on MLE estimate')
+        ax = axarr[3]
+        median.rolling(rolling).mean().plot(ax=ax)
+        ax.set(title=f'Rolling ({rolling}) mean median absolute error on MLE estimate')
 
     axarr[-1].set(xlabel='Active learning iteration')
     return fig
@@ -55,7 +57,8 @@ def plot_mle_error(
 
 def plot_total_mse(
         test_stat: pd.DataFrame,
-        test_stat_exact: pd.DataFrame
+        test_stat_exact: pd.DataFrame,
+        rolling: int = 50
 ) -> Figure:
     group_levels = ['Learner', 'Iteration']
     columns = test_stat.columns.get_level_values('Learner').unique()
@@ -77,14 +80,54 @@ def plot_total_mse(
     def _ensure_numeric(df):
         return df.astype(np.float64).set_index(df.index.astype(np.float64))
 
-    fig, ax = plt.subplots()
-    plot_line_graph_with_errors(
-        mean=_ensure_numeric(mean),
-        stderr=_ensure_numeric(stderr),
-        ax=ax
-    )
-    ax.set(title='Total MSE', xlabel='Active learning iteration')
+    mean, stderr = map(_ensure_numeric, [mean, stderr])
 
+    fig, axarr = plt.subplots(2, figsize=(10, 10))
+    plot_line_graph_with_errors(
+        mean=mean,
+        stderr=stderr,
+        ax=axarr[0]
+    )
+    axarr[0].set(title='Total MSE', xlabel=None)
+
+    rolling_mean = mean.rolling(rolling).mean()
+    rolling_stderr = stderr.rolling(rolling).mean()
+    plot_line_graph_with_errors(
+        mean=rolling_mean,
+        stderr=rolling_stderr,
+        ax=axarr[1]
+    )
+    axarr[1].set(title=f'Rolling {rolling} mean total MSE',
+                 xlabel='Active learning iteration')
+
+    return fig
+
+
+def plot_mse_vs_theta(
+        test_stat: pd.DataFrame,
+        test_stat_exact: pd.DataFrame,
+        iterations: List[int]
+):
+    iterations = list(map(str, iterations))
+    fig, axarr = plt.subplots(len(iterations), figsize=(10, len(iterations) * 5))
+    for iteration, ax in zip(iterations, axarr):
+        data = test_stat.loc[:, idx[:, :, iteration]].droplevel('Iteration', axis=1)
+        gb = data.groupby(by='Learner', axis=1)
+        squared_error = pd.concat([
+            (df.droplevel('Learner', axis=1) - test_stat_exact) ** 2 for _, df in gb
+        ], axis=1, keys=gb.groups.keys(), names=['Learner'])
+        mean = squared_error.mean(axis=1, level='Learner')
+        stderr = squared_error.sem(axis=1, level='Learner')
+        plot_line_graph_with_errors(mean=mean, stderr=stderr, ax=ax)
+        ax.set(
+            title=f'Iteration {iteration}',
+            xlabel=None,
+            ylabel='MSE',
+            yscale='log'
+        )
+        ax.axvline(x=0.45, color='k', lw=2)
+
+    axarr[-1].set(xlabel=THETA_STR)
     return fig
 
 
@@ -120,8 +163,8 @@ def plot_trialed_thetas_hist(trialed_thetas: List[pd.DataFrame]):
         subplots=True,
         bins=80,
         figsize=(10, 20),
-        ylim=(0, 150)
     )
+    plt.xlabel(THETA_STR)
     return plt.gcf()
 
 
@@ -192,20 +235,23 @@ def analyse_mixtures_active_learning(
     test_stat_exact.columns = range(len(nllr_exact))
 
     experiments = [0, 1, 2]
-    iterations = np.linspace(0, 100, 11).astype(np.int64)
-    learner_names = ['Random', 'UCBM_1.0', 'UCBM_2.5']
+    iterations = np.linspace(0, 1000, 11).astype(np.int64)
+    learner_names = ['Random', 'UCB_2.5', 'UCBM_2.5']
 
     mle_err_fig = plot_mle_error(
         mle=mle,
-        learner_names=learner_names
+        learner_names=learner_names,
+        plot_median=False
     )
-    mse_fig = plot_total_mse(
+    total_mse = plot_total_mse(
         test_stat=test_stat,
         test_stat_exact=test_stat_exact,
     )
-    test_stat_fig = plot_final_iteration_test_stat(
+
+    mse_vs_theta = plot_mse_vs_theta(
         test_stat=test_stat,
-        test_stat_exact=test_stat_exact
+        test_stat_exact=test_stat_exact,
+        iterations=[0, 100, 500, 1000]
     )
 
     # *****************************
@@ -218,7 +264,7 @@ def analyse_mixtures_active_learning(
         learner_names=learner_names,
         experiments=None
     )
-    debug_fig = plot_debug_graph(
+    predictions_fig = plot_predictions(
         test_stat=test_stat,
         std=std,
         test_stat_exact=test_stat_exact,
@@ -229,7 +275,7 @@ def analyse_mixtures_active_learning(
     std_fig = _analyse_std(
         test_stat=nllr,
         std=std,
-        learner_names=['UCBM_1.0'],
+        learner_names=['UCBM_2.5'],
         iterations=iterations,
         experiments=experiments,
     )
@@ -237,9 +283,12 @@ def analyse_mixtures_active_learning(
     # Collect figures
     figures = dict(
         mle_err=mle_err_fig,
-        mse=mse_fig,
-        test_stat=test_stat_fig,
-        trialed_thetas=trialed_thetas_hist
+        mse=total_mse,
+        trialed_thetas=trialed_thetas_hist,
+        convergence_plot=convergence_plot,
+        mse_vs_theta=mse_vs_theta,
+        predictions=predictions_fig,
+        std=std_fig
     )
 
     return figures
