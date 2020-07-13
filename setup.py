@@ -2,13 +2,13 @@ from setuptools import setup
 
 setup(
     name='alre_experiments',
-    version='0.2dev',
+    version='0.2',
     packages=[
         'util',
         'experiments',
         'experiments.mixtures_parameterized',
         'experiments.mixtures_active_learning',
-	'experiments.mixtures_active_learning.mal_analysis'
+        'experiments.mixtures_active_learning.mal_analysis'
     ],
     url='github.com/cjs220/alre_experiments',
     license='MIT',
