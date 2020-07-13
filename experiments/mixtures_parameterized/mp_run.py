@@ -1,7 +1,7 @@
 from argparse import ArgumentParser
 
-from experiments.mixtures_parameterized.analysis import analyse_mixtures_parameterized
-from experiments.mixtures_parameterized.experiment import run_mixtures_parameterized
+from experiments.mixtures_parameterized.mp_analysis import analyse_mixtures_parameterized
+from experiments.mixtures_parameterized.mp_experiment import run_mixtures_parameterized
 from util import ExperimentHandler
 
 

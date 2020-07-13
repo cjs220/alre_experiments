@@ -5,6 +5,7 @@ from typing import Sequence, Dict
 
 import numpy as np
 import pandas as pd
+from pandas.core.generic import NDFrame
 from scipy.stats import trim_mean
 
 from active_learning_ratio_estimation.model.ratio_model import calibrated_param_scan, param_scan, exact_param_scan
@@ -123,7 +124,7 @@ def run_mixtures_parameterized(
         theta_true: float,
         n_true: int,
         logger: Logger = None
-) -> Sequence[pd.DataFrame]:
+) -> Dict[str, NDFrame]:
     logger = logger or logging.getLogger(__name__)
     logger.info('Starting experiment')
     t0 = time.time()

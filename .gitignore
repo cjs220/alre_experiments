@@ -1,6 +1,7 @@
 .idea/
 runs/
 plots/
+data/
 *.svg
 
 

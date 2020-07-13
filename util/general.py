@@ -1,3 +1,4 @@
+import time
 from typing import Dict, Callable
 import os
 import random
@@ -8,7 +9,6 @@ import pandas as pd
 from joblib import Parallel, delayed
 from matplotlib.figure import Figure
 from pandas.core.generic import NDFrame
-import matplotlib.pyplot as plt
 import tensorflow as tf
 
 
@@ -18,23 +18,8 @@ def disable_tensorflowgpu():
 
 def set_all_random_seeds(seed=0):
     np.random.seed(seed)
-    tf.random.set_seed(0)
-    random.seed(0)
-
-
-def matplotlib_setup(size=24, use_tex=False):
-    params = {
-        'legend.fontsize': size * 0.75,
-        'figure.figsize': (10, 5),
-        'axes.labelsize': size,
-        'axes.titlesize': size,
-        'xtick.labelsize': size * 0.75,
-        'ytick.labelsize': size * 0.75,
-        'font.family': 'sans-serif',
-        'axes.titlepad': 12.5,
-        'text.usetex': use_tex
-    }
-    plt.rcParams.update(params)
+    tf.random.set_seed(seed)
+    random.seed(seed)
 
 
 def save_results(
@@ -75,19 +60,21 @@ def run_parallel_experiments(
         **experiment_func_kwargs
 ):
     return Parallel(n_jobs=n_jobs, verbose=verbose)(
-        delayed(experiment_func)(**experiment_func_kwargs) for _ in range(n_experiments)
+        delayed(experiment_func)(**experiment_func_kwargs)
+        for _ in range(n_experiments)
     )
 
 
-def plot_line_graph_with_errors(mean: pd.DataFrame, stderr: pd.DataFrame, ax=None, alpha=0.3, **kwargs):
-    ax = mean.plot(ax=ax)
-    ax.set_prop_cycle(None)
-    for col in stderr.columns:
-        ax.fill_between(
-            mean.index.values,
-            mean[col].values - stderr[col].values,
-            mean[col].values + stderr[col].values,
-            alpha=alpha,
-            **kwargs
-        )
-    return ax
+def experiment(func: Callable) -> Callable:
+    # decorator for experiment functions
+
+    def wrapper(*args, random_seed=0, **kwargs):
+        logger = kwargs['logger']
+        logger.info('Starting experiment')
+        t0 = time.time()
+        set_all_random_seeds(random_seed)
+        results = func(*args, **kwargs)
+        logger.info(f'Finished experiment; total time {int(time.time() - t0):.3E} s')
+        return results
+
+    return wrapper
